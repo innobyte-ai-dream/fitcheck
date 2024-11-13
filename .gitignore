@@ -1,0 +1,13 @@
+.DS_Store
+*.idea
+*.o
+*.a
+*.so
+*.env
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.zip
+tmp
