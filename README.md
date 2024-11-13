@@ -11,7 +11,7 @@ mediapipe
 psycopg2
 redis
 
-## Fronten requirements
+## Frontend requirements
 node
 react
 
