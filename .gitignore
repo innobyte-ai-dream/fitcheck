@@ -12,3 +12,4 @@
 *.zip
 tmp
 /model/fitcheck-poc/utils/__pycache__
+model/fitcheck-poc/utils/__pycache__/drawing.cpython-312.pyc
