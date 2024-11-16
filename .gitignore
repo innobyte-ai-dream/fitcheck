@@ -11,3 +11,4 @@
 *.dylib
 *.zip
 tmp
+/model/fitcheck-poc/utils/__pycache__
