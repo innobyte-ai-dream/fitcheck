@@ -4,3 +4,5 @@ tensorflow
 mediapipe
 psycopg2
 redis
+requests
+python-dotenv
