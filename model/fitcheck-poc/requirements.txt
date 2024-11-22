@@ -2,3 +2,5 @@ pytorch
 torchvision 
 torchaudio
 ultralytics
+super-gradients
+
