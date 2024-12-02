@@ -1,6 +1,8 @@
+from datetime import datetime
 import json
 from typing import Literal, Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 try:
@@ -9,6 +11,11 @@ try:
 except ImportError:
     from openai import async_simple_prompt, async_simple_prompt_35
     from file_to_base64 import read_upload_files
+
+try:
+    from backend.text_to_speech import azure_text_to_speech
+except ImportError:
+    from text_to_speech import azure_text_to_speech
 
 from typing import List
 from fastapi import UploadFile
@@ -38,7 +45,7 @@ SYSTEM_PROMPT_TEMPLATE = """
 Act as fitness trainer.
 Your character is {gender}, {character}.
 Give advice correct position and cheer-up to user from exercise <position> and motion <interpret> from input.
-Advice in 1 - 2 phrase/sentences with mood of trainer voice ('power-up', 'neutral', 'cool-down').
+Advice in 1 - 2 phrase/sentences with mood of trainer voice ('power-up', 'neutral', 'cool-down'), with type of message ('correct','wrong').
 Advice must be in {language} language.
 Return in json in <output> tag.
 """
@@ -121,9 +128,26 @@ async def execute_prompt_35(prompt: TextPrompt):
 @app.post("/api/v1/prompt/file/", name="Prompt with files")
 async def execute_prompt(
     prompt: str,
+    files: List[UploadFile] = File(...),
     systemPrompt: Optional[str] = None,
 ):
     return await async_simple_prompt(
         user_prompt=prompt,
         system_prompt=systemPrompt,
+        images=await read_upload_files(files),
     )
+
+
+@app.post("/api/v1/speech/", name="Text to speech")
+@app.get("/api/v1/speech/", name="Text to speech")
+async def text_to_speech(text: str, voice_name: str = "en-US-AvaMultilingualNeural"):
+    StreamResponse = StreamingResponse(
+        azure_text_to_speech(text, voice_name),
+        media_type="audio/mpeg",
+    )
+    return StreamResponse
+
+
+@app.get("/", name="Root")
+def index():
+    return {"message": "Welcome to FitCheck API!", "time": datetime.now()}

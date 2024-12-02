@@ -1,6 +1,5 @@
 from typing import List, Optional
 import requests
-import base64
 
 try:
     from configuration import (
