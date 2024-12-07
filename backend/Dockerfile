@@ -1,10 +1,10 @@
-FROM python:3.10
+# FROM tiangolo/uvicorn-gunicorn:python3.11-slim
+FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /backend
+COPY backend/requirements.txt .
+RUN pip install -r requirements.txt --no-cache-dir   
 
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY ./backend/ /backend
 
-COPY . .
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["gunicorn", "app:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:80"]

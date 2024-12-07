@@ -86,6 +86,7 @@ EXAMPLE_2 = OutputFormat(
     mood="cheerful",
 )
 
+_voice_style = "\n".join(VOICE_STYLE)
 SYSTEM_PROMPT_TEMPLATE = (
     """
 Act as fitness coach.
@@ -100,7 +101,7 @@ Return in text in <output> tag - first line is "rate" of speech, second line is 
     + f"""
 Here is choice of mood:
 ```
-{'\n'.join(VOICE_STYLE)}
+{_voice_style}
 ```
 Example advice in English in "excited" mood:
 <output>

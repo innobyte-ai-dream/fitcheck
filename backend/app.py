@@ -141,6 +141,7 @@ async def text_to_speech(
     rate: float = 1,
     lang: str = "en-US",
     style: Literal[*VOICE_STYLE] = "default",  # type: ignore
+    stream_size: Optional[int] = None,
 ):
     StreamResponse = StreamingResponse(
         azure_text_to_speech_ssml(
@@ -149,13 +150,15 @@ async def text_to_speech(
             rate=rate,
             lang=lang,
             style=style,
+            stream_size=stream_size,
         ),
-        media_type="audio/mpeg",
+        media_type="audio/mp3",
         headers={
             "x-tts-rate": str(rate),
             "x-tts-lang": lang,
             "x-tts-voice": voice_name,
             "x-tts-text": quote(text[:1024]),
+            # "Content-Disposition": f'attachment; filename="{voice_name}.mp3"',
         },
     )
     return StreamResponse

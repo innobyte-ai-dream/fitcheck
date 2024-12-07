@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Literal, Set
+from typing import Dict, Literal, Optional, Set
 import azure.cognitiveservices.speech as speechsdk
 
 try:
@@ -198,6 +198,7 @@ VOICE_STYLE = (
 async def azure_text_to_speech(
     text: str,
     voice_name: Literal[*VOICE_NAME] = "en-US-AvaMultilingualNeural",  # type: ignore
+    stream_size: Optional[int] = None,
 ):
     if voice_name not in VOICE_NAME:
         raise ValueError(f"Invalid voice name: {voice_name}.")
@@ -218,7 +219,7 @@ async def azure_text_to_speech(
     result = speech_synthesizer.start_speaking_text_async(text).get()
     stream = speechsdk.AudioDataStream(result)
 
-    audio_buffer = bytes(VOICE_STREAM_SIZE)
+    audio_buffer = bytes(stream_size or VOICE_STREAM_SIZE)
     while True:
         if result.reason == speechsdk.ResultReason.Canceled:
             raise ValueError(
@@ -227,7 +228,7 @@ async def azure_text_to_speech(
         buffer_size = stream.read_data(audio_buffer)
         if buffer_size <= 0:
             break
-        yield audio_buffer
+        yield audio_buffer[:buffer_size]
 
 
 SSML_TEMPLATE = """
@@ -249,6 +250,7 @@ async def azure_text_to_speech_ssml(
     rate: float = 0,
     lang: str = "en-US",
     style: Literal[*VOICE_STYLE] = "default",  # type: ignore
+    stream_size: Optional[int] = None,
 ):
     if voice_name not in VOICE_NAME:
         raise ValueError(f"Invalid voice name: {voice_name}.")
@@ -269,7 +271,7 @@ async def azure_text_to_speech_ssml(
         region=AZURE_REGION,
     )
     speech_config.set_speech_synthesis_output_format(
-        speechsdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3
+        speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3
     )
 
     speech_synthesizer = speechsdk.SpeechSynthesizer(
@@ -282,7 +284,7 @@ async def azure_text_to_speech_ssml(
     )
     stream = speechsdk.AudioDataStream(result)
 
-    audio_buffer = bytes(VOICE_STREAM_SIZE)
+    audio_buffer = bytes(stream_size or VOICE_STREAM_SIZE)
     total_size = 0
     while True:
         if result.reason == speechsdk.ResultReason.Canceled:
@@ -295,4 +297,4 @@ async def azure_text_to_speech_ssml(
         if buffer_size <= 0:
             logger.info(f"Total size: {total_size}")
             break
-        yield audio_buffer
+        yield audio_buffer[:buffer_size]
