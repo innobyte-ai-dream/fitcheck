@@ -1,26 +1,36 @@
 from datetime import datetime
-import json
-from typing import Literal, Optional
-from fastapi import FastAPI, File
+from traceback import print_exc, format_exc
+from typing import Optional
+from urllib.parse import quote
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
+import orjson
 from pydantic import BaseModel
+from typing import List, Literal
+import requests
 
 try:
     from backend.openai import async_simple_prompt, async_simple_prompt_35
     from backend.file_to_base64 import read_upload_files
-    from backend.coach import text_advice, TextAdvice
+    from backend.text_to_speech import (
+        azure_text_to_speech,
+        azure_text_to_speech_ssml,
+        PATH_VOICE_SSML,
+        VOICE_NAME,
+        VOICE_STYLE,
+    )
+    from backend.coach import coach_router
 except ImportError:
     from openai import async_simple_prompt, async_simple_prompt_35
     from file_to_base64 import read_upload_files
-    from coach import text_advice, TextAdvice
-
-try:
-    from backend.text_to_speech import azure_text_to_speech
-except ImportError:
-    from text_to_speech import azure_text_to_speech
-
-from typing import List
-from fastapi import UploadFile
+    from coach import coach_router
+    from text_to_speech import (
+        azure_text_to_speech,
+        azure_text_to_speech_ssml,
+        PATH_VOICE_SSML,
+        VOICE_NAME,
+        VOICE_STYLE,
+    )
 
 app = FastAPI(
     version="0.1.0",
@@ -30,9 +40,61 @@ app = FastAPI(
 )
 
 
-@app.post("/api/v1/advice/text", name="Simple text prompt")
-async def generate_text(input_advice: TextAdvice):
-    return await text_advice(input_advice)
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        # you probably want some kind of logging here
+        print_exc()
+
+        detail = {"error": format_exc()}
+        try:
+            detail["errorObject"] = orjson.loads(orjson.dumps(vars(e), default=str))
+        except Exception:
+            pass
+
+        if isinstance(e, HTTPException):
+            return e
+        if isinstance(e, requests.RequestException):
+            req: requests.Request = getattr(e, "request", None)
+            response: requests.Response = getattr(e, "response", None)
+
+            req_detail = {
+                "url": getattr(req, "url", None),
+                "method": getattr(req, "method", None),
+                "headers": getattr(req, "headers", None),
+                "body": getattr(req, "body", None),
+                "params": getattr(req, "params", None),
+            }
+            function_req_detail = {
+                "url": getattr(request, "url", None),
+                "method": getattr(request, "method", None),
+                "headers": getattr(request, "headers", None),
+                "body": getattr(request, "body", None),
+                "params": getattr(request, "params", None),
+            }
+            response_detail = {
+                "status_code": getattr(response, "status_code", None),
+                "headers": getattr(response, "headers", None),
+                "text": getattr(response, "text", None),
+            }
+            return HTTPException(
+                status_code=response_detail["status_code"] or 500,
+                detail={
+                    **detail,
+                    "request": req_detail,
+                    "function_request": function_req_detail,
+                    "response": getattr(response, "text", None),
+                },
+                headers=response_detail["headers"],
+            )
+
+        return HTTPException(status_code=500, detail=detail)
+
+
+app.middleware("http")(catch_exceptions_middleware)
+
+app.include_router(coach_router, prefix="/api/v1/coach", tags=["Coach"])
 
 
 class TextPrompt(BaseModel):
@@ -63,12 +125,38 @@ async def execute_prompt(
     )
 
 
-@app.post("/api/v1/speech/", name="Text to speech")
-@app.get("/api/v1/speech/", name="Text to speech")
+@app.get("/api/v1/speech/simple", name="Text to speech")
 async def text_to_speech(text: str, voice_name: str = "en-US-AvaMultilingualNeural"):
     StreamResponse = StreamingResponse(
         azure_text_to_speech(text, voice_name),
         media_type="audio/mpeg",
+    )
+    return StreamResponse
+
+
+@app.get(PATH_VOICE_SSML, name="Text to speech")
+async def text_to_speech(
+    text: str = "ให้ยกแขนซ้ายให้สูงขึ้นนะ <break/> ขวาทำได้ดีแล้ว! <break/> สู้ๆ! 1 2 <break/> 3",
+    voice_name: Literal[*VOICE_NAME] = "en-US-AvaMultilingualNeural",  # type: ignore
+    rate: float = 1,
+    lang: str = "en-US",
+    style: Literal[*VOICE_STYLE] = "default",  # type: ignore
+):
+    StreamResponse = StreamingResponse(
+        azure_text_to_speech_ssml(
+            text,
+            voice_name=voice_name,
+            rate=rate,
+            lang=lang,
+            style=style,
+        ),
+        media_type="audio/mpeg",
+        headers={
+            "x-tts-rate": str(rate),
+            "x-tts-lang": lang,
+            "x-tts-voice": voice_name,
+            "x-tts-text": quote(text[:1024]),
+        },
     )
     return StreamResponse
 
