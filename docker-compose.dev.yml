@@ -1,0 +1,16 @@
+services:
+  api:
+    image: fitcheckapi.azurecr.io/fitcheck/fitcheck-api:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - GPT35_AZURE_OPEN_AI_URL=${GPT35_AZURE_OPEN_AI_URL}
+      - AZURE_OPEN_AI_URL=${AZURE_OPEN_AI_URL}
+      - AZURE_SERVICE_REGION=${AZURE_SERVICE_REGION}
+      - AZURE_OPEN_AI_API_KEY=${AZURE_OPEN_AI_API_KEY}
+      - AZURE_TEXT_TO_SPEECH=${AZURE_TEXT_TO_SPEECH}
+      - VOICE_STREAM_SIZE=${VOICE_STREAM_SIZE}
+      - WORKERS=${WORKERS:-4}
