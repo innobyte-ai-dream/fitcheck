@@ -36,7 +36,17 @@ except ImportError:
 app = FastAPI(
     version="0.1.0",
     title="FitCheck API",
-    description="An API for the FitCheck app.",
+    description="""An API for the FitCheck app.
+    - **Coach**: Get advice on your workout form.
+    - **Prompt**: Test a response from the AI model.
+    - **Speech**: Convert text to speech.
+    
+## Quick Start for Coach with Voice
+1. Send POST message to `/api/v1/coach/voice` [Swagger UI](/docs#/Coach/execute_coach_advice) or [ReDoc](/redoc#/Coach/execute_coach_advice).
+2. Receive the advice in the JSON response.
+3. Redirect to the URL in the `location` header to get the voice response.
+4. Play the stream of voice response.
+""",
     docs_url="/docs",
 )
 
@@ -158,17 +168,17 @@ class TextPrompt(BaseModel):
     systemPrompt: Optional[str] = None
 
 
-@app.post("/api/v1/prompt/", name="Simple text prompt")
+@app.post("/api/v1/prompt/", name="Simple text prompt", tags=["Text Prompt"])
 async def execute_prompt(prompt: TextPrompt):
     return await async_simple_prompt(prompt.prompt, prompt.systemPrompt)
 
 
-@app.post("/api/v1/prompt/3.5", name="Simple text prompt")
+@app.post("/api/v1/prompt/3.5", name="Simple text prompt", tags=["Text Prompt"])
 async def execute_prompt_35(prompt: TextPrompt):
     return await async_simple_prompt_35(prompt.prompt, prompt.systemPrompt)
 
 
-@app.post("/api/v1/prompt/file/", name="Prompt with files")
+@app.post("/api/v1/prompt/file/", name="Prompt with files", tags=["Text Prompt"])
 async def execute_prompt(
     prompt: str,
     files: List[UploadFile] = File(...),
@@ -181,7 +191,7 @@ async def execute_prompt(
     )
 
 
-@app.get("/api/v1/speech/simple", name="Text to speech")
+@app.get("/api/v1/speech/simple", name="Text to speech", tags=["Text to Speech"])
 async def text_to_speech(text: str, voice_name: str = "en-US-AvaMultilingualNeural"):
     StreamResponse = StreamingResponse(
         azure_text_to_speech(text, voice_name),
@@ -190,7 +200,11 @@ async def text_to_speech(text: str, voice_name: str = "en-US-AvaMultilingualNeur
     return StreamResponse
 
 
-@app.get(PATH_VOICE_SSML, name="Text to speech")
+@app.get(
+    PATH_VOICE_SSML,
+    name="Text to speech in advance mode by SSML",
+    tags=["Text to Speech"],
+)
 async def text_to_speech(
     text: str = "ให้ยกแขนซ้ายให้สูงขึ้นนะ <break/> ขวาทำได้ดีแล้ว! <break/> สู้ๆ! 1 2 <break/> 3",
     voice_name: Literal[*VOICE_NAME] = "en-US-AvaMultilingualNeural",  # type: ignore

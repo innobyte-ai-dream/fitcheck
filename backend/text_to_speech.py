@@ -220,13 +220,16 @@ async def azure_text_to_speech(
     stream = speechsdk.AudioDataStream(result)
 
     audio_buffer = bytes(stream_size or VOICE_STREAM_SIZE)
+    total_size = 0
     while True:
         if result.reason == speechsdk.ResultReason.Canceled:
             raise ValueError(
                 f"Error ({result.cancellation_details.reason}: {result.cancellation_details.error_code}): {result.cancellation_details.error_details}"
             )
         buffer_size = stream.read_data(audio_buffer)
+        total_size += buffer_size
         if buffer_size <= 0:
+            logger.info(f"Total size: {total_size}")
             break
         yield audio_buffer[:buffer_size]
 

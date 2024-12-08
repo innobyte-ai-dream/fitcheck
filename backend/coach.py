@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from urllib.parse import urlencode
 
 from fastapi.responses import ORJSONResponse
@@ -30,6 +30,7 @@ class TextAdvice(BaseModel):
     character: str = "24 years old, cute, friendly, and energetic"
     language: str = "th-TH"
     voiceName: Literal[*VOICE_NAME] = "en-US-AvaMultilingualNeural"  # type: ignore
+    streamSize: Optional[int] = None
 
 
 class OutputFormat(BaseModel):
@@ -67,6 +68,7 @@ class OutputFormat(BaseModel):
                     rate=rate,
                     lang=input_advice.language,
                     style=mood,
+                    stream_size=input_advice.streamSize,
                 )
             )
         )
@@ -155,7 +157,10 @@ async def text_advice(input_advice: TextAdvice):
     )
 
 
-@coach_router.post("/voice", name="Response advice in mp3 audio format")
+@coach_router.post(
+    "/voice",
+    name="Response advice in text and then redirect to URL to get streaming of mp3 audio format",
+)
 async def voice_advice(input_advice: TextAdvice):
     advice = await text_advice(input_advice)
     # redirect to advice.url
