@@ -3,11 +3,12 @@ from traceback import print_exc, format_exc
 from typing import Optional
 from urllib.parse import quote
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import ORJSONResponse, StreamingResponse
 import orjson
 from pydantic import BaseModel
 from typing import List, Literal
 import requests
+from aiohttp.client_exceptions import ClientResponseError
 
 try:
     from backend.openai import async_simple_prompt, async_simple_prompt_35
@@ -54,7 +55,12 @@ async def catch_exceptions_middleware(request: Request, call_next):
             pass
 
         if isinstance(e, HTTPException):
-            return e
+            return ORJSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail},
+                headers=e.headers,
+            )
+
         if isinstance(e, requests.RequestException):
             req: requests.Request = getattr(e, "request", None)
             response: requests.Response = getattr(e, "response", None)
@@ -78,18 +84,68 @@ async def catch_exceptions_middleware(request: Request, call_next):
                 "headers": getattr(response, "headers", None),
                 "text": getattr(response, "text", None),
             }
-            return HTTPException(
+            return ORJSONResponse(
                 status_code=response_detail["status_code"] or 500,
-                detail={
+                content={
                     **detail,
                     "request": req_detail,
                     "function_request": function_req_detail,
-                    "response": getattr(response, "text", None),
+                    "response": response_detail,
                 },
                 headers=response_detail["headers"],
             )
-
-        return HTTPException(status_code=500, detail=detail)
+            # raise HTTPException(
+            #     status_code=response_detail["status_code"] or 500,
+            #     detail={
+            #         **detail,
+            #         "request": req_detail,
+            #         "function_request": function_req_detail,
+            #         "response": getattr(response, "text", None),
+            #     },
+            #     headers=response_detail["headers"],
+            # ) from e
+        if isinstance(e, ClientResponseError):
+            request_info = getattr(e, "request_info", None)
+            request_detail = {
+                "url": str(getattr(request_info, "url", "")),
+                "method": getattr(request_info, "method", None),
+                "headers": str(getattr(request_info, "headers", "")),
+                "real_url": str(getattr(request_info, "real_url", "")),
+            }
+            history = getattr(e, "history", [])
+            response_detail = {
+                "status_code": getattr(e, "status", None) or getattr(e, "code", None),
+                "text": getattr(e, "message", None),
+                "headers": str(getattr(e, "headers", "")),
+                "history": [
+                    {
+                        "status_code": h.status,
+                        "text": h.text(),
+                        "headers": str(h.headers),
+                    }
+                    for h in history
+                ],
+            }
+            return ORJSONResponse(
+                status_code=response_detail["status_code"] or 500,
+                content={
+                    **detail,
+                    "response": response_detail,
+                    "request": request_detail,
+                },
+                # headers=response_detail["headers"],
+            )
+            # raise HTTPException(
+            #     status_code=response_detail["status_code"] or 500,
+            #     detail={
+            #         **detail,
+            #         "response": response_detail,
+            #         "request": request_detail,
+            #     },
+            #     headers=response_detail["headers"],
+            # ) from e
+        return ORJSONResponse(status_code=500, content=detail)
+        # raise HTTPException(status_code=500, detail=detail) from e
 
 
 app.middleware("http")(catch_exceptions_middleware)
